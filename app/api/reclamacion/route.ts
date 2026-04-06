@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Anthropic } from '@anthropic-ai/sdk';
-import * as pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+// Importar pdfjs-dist dinámicamente
+let pdfjsLib: any = null;
+
+async function initPdfjs() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import('pdfjs-dist');
+  }
+  return pdfjsLib;
+}
 
 const SYSTEM_PROMPT = `Eres un abogado especialista en accidentes de tráfico y reclamaciones a compañías
 aseguradoras en España. Tienes profundo conocimiento de:
@@ -64,8 +73,25 @@ Estructura idéntica al modelo de reclamación previa proporcionado.
 Responde ÚNICAMENTE con el texto completo de la reclamación, SIN explicaciones adicionales.`;
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  const data = await (pdfParse as any).default(buffer);
-  return data.text;
+  try {
+    const pdfjs = await initPdfjs();
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str || '')
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+
+    return fullText;
+  } catch (error) {
+    console.error('Error extracting PDF:', error);
+    throw new Error('No se pudo extraer texto del PDF');
+  }
 }
 
 async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
