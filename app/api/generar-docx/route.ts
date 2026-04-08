@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  AlignmentType,
   Document,
+  LineRuleType,
   Packer,
   Paragraph,
   TextRun,
 } from 'docx';
 
+type GenerarDocxBody = {
+  carta?: string;
+  nombreReclamante?: string;
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const { carta, nombreReclamante } = await request.json();
+    const { carta, nombreReclamante } = (await request.json()) as GenerarDocxBody;
 
     if (!carta || !nombreReclamante) {
       return NextResponse.json(
@@ -23,109 +30,100 @@ export async function POST(request: NextRequest) {
       day: 'numeric',
     });
 
-    // Dividir la carta en párrafos
-    const parrafos = carta.split('\n').filter((p: string) => p.trim() !== '');
+    const parrafos = carta
+      .split('\n')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
 
-    // Crear párrafos del documento
-    const paragrafosDocumento = [
-      // Encabezado con logo/nombre de empresa
+    const parrafosDocumento: Paragraph[] = [
       new Paragraph({
         children: [
           new TextRun({
             text: 'ACCIDENTALEX',
             font: 'Arial',
-            size: 36, // 18pt en bold
+            size: 36,
             bold: true,
             color: '4a9999',
           }),
         ],
-        alignment: 'center' as any,
+        alignment: AlignmentType.CENTER,
         spacing: {
           after: 40,
         },
       }),
-      // Subtítulo
       new Paragraph({
         children: [
           new TextRun({
             text: 'ABOGADOS ESPECIALIZADOS EN ACCIDENTES',
             font: 'Arial',
-            size: 18, // 9pt
+            size: 18,
             color: '888888',
           }),
         ],
-        alignment: 'center' as any,
+        alignment: AlignmentType.CENTER,
         spacing: {
           after: 200,
         },
       }),
-      // Línea en blanco separadora
       new Paragraph({
         text: '',
         spacing: {
           after: 160,
         },
       }),
-      // Título centrado en negrita
       new Paragraph({
         children: [
           new TextRun({
-            text: 'RECLAMACIÓN EXTRAJUDICIAL - ACCIDENTE DE TRÁFICO',
+            text: 'RECLAMACION EXTRAJUDICIAL - ACCIDENTE DE TRAFICO',
             bold: true,
             font: 'Arial',
-            size: 24, // 12pt
+            size: 24,
           }),
         ],
-        alignment: 'center' as any,
+        alignment: AlignmentType.CENTER,
         spacing: {
           after: 160,
         },
       }),
-      // Línea en blanco separadora
       new Paragraph({
         text: '',
         spacing: {
           after: 160,
         },
       }),
-      // Contenido de la carta
       ...parrafos.map(
-        (parrafo: string) =>
+        (parrafo) =>
           new Paragraph({
             children: [
               new TextRun({
                 text: parrafo,
                 font: 'Arial',
-                size: 24, // 12pt
+                size: 24,
               }),
             ],
-            alignment: 'left' as any,
+            alignment: AlignmentType.LEFT,
             spacing: {
               after: 160,
               line: 360,
-              lineRule: 'auto' as any,
+              lineRule: LineRuleType.AUTO,
             },
           })
       ),
-    ];
-
-    // Agregar párrafo final con la fecha
-    paragrafosDocumento.push(
       new Paragraph({
         children: [
           new TextRun({
             text: `Documento generado el ${fechaActual}`,
             font: 'Arial',
-            size: 20, // 10pt
+            size: 20,
             italics: true,
           }),
         ],
-        alignment: 'center' as any,
+        alignment: AlignmentType.CENTER,
         spacing: {
           before: 400,
         },
-      })
-    );
+      }),
+    ];
 
     const doc = new Document({
       sections: [
@@ -140,7 +138,7 @@ export async function POST(request: NextRequest) {
               },
             },
           },
-          children: paragrafosDocumento,
+          children: parrafosDocumento,
         },
       ],
     });
@@ -151,11 +149,14 @@ export async function POST(request: NextRequest) {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     });
 
+    const cleanName = nombreReclamante.replace(/\s+/g, '_');
+    const today = new Date().toISOString().split('T')[0];
+
     return new NextResponse(blob, {
       headers: {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="reclamacion_${nombreReclamante.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx"`,
+        'Content-Disposition': `attachment; filename="reclamacion_${cleanName}_${today}.docx"`,
       },
     });
   } catch (error) {

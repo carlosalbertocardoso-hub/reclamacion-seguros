@@ -3,17 +3,55 @@
 import { useState } from 'react';
 
 interface FormDataType {
-  nombre: string;
-  apellidos: string;
-  dni: string;
-  direccion: string;
-  telefono: string;
-  email: string;
-  aseguradora: string;
-  numeroPóliza: string;
-  matricula: string;
   descripcion: string;
-  tiposDaños: string[];
+  tiposDanos: string[];
+}
+
+const MIME_TYPES_ADMITIDOS = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/tiff',
+  'image/heic',
+  'image/heif',
+]);
+
+const EXTENSIONES_ADMITIDAS = [
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.csv',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.bmp',
+  '.tiff',
+  '.tif',
+  '.heic',
+  '.heif',
+];
+
+function esArchivoAdmitido(file: File): boolean {
+  const type = file.type.toLowerCase();
+  if (MIME_TYPES_ADMITIDOS.has(type)) {
+    return true;
+  }
+
+  const name = file.name.toLowerCase();
+  return EXTENSIONES_ADMITIDAS.some((ext) => name.endsWith(ext));
 }
 
 export default function ReclamacionForm() {
@@ -23,28 +61,18 @@ export default function ReclamacionForm() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<'form' | 'generating' | 'result'>('form');
   const [formData, setFormData] = useState<FormDataType>({
-    nombre: '',
-    apellidos: '',
-    dni: '',
-    direccion: '',
-    telefono: '',
-    email: '',
-    aseguradora: '',
-    numeroPóliza: '',
-    matricula: '',
     descripcion: '',
-    tiposDaños: [],
+    tiposDanos: [],
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
-    const invalidFiles = files.filter((f) => !validTypes.includes(f.type));
+    const invalidFiles = files.filter((f) => !esArchivoAdmitido(f));
 
     if (invalidFiles.length > 0) {
-      setError('Todos los archivos deben ser PDF o DOCX');
+      setError('Formato no admitido. Usa PDF, Word, Excel o imagen (JPG, PNG, etc.)');
       return;
     }
 
@@ -68,11 +96,10 @@ export default function ReclamacionForm() {
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length === 0) return;
 
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
-    const invalidFiles = files.filter((f) => !validTypes.includes(f.type));
+    const invalidFiles = files.filter((f) => !esArchivoAdmitido(f));
 
     if (invalidFiles.length > 0) {
-      setError('Todos los archivos deben ser PDF o DOCX');
+      setError('Formato no admitido. Usa PDF, Word, Excel o imagen (JPG, PNG, etc.)');
       return;
     }
 
@@ -97,9 +124,9 @@ export default function ReclamacionForm() {
   const handleCheckboxChange = (tipo: string) => {
     setFormData((prev) => ({
       ...prev,
-      tiposDaños: prev.tiposDaños.includes(tipo)
-        ? prev.tiposDaños.filter((t) => t !== tipo)
-        : [...prev.tiposDaños, tipo],
+      tiposDanos: prev.tiposDanos.includes(tipo)
+        ? prev.tiposDanos.filter((t) => t !== tipo)
+        : [...prev.tiposDanos, tipo],
     }));
   };
 
@@ -107,9 +134,8 @@ export default function ReclamacionForm() {
     e.preventDefault();
     setError(null);
 
-    // Validaciones
-    if (!formData.nombre || !formData.apellidos || !formData.dni || archivos.length === 0) {
-      setError('Por favor complete los campos requeridos y suba al menos un archivo');
+    if (archivos.length === 0) {
+      setError('Por favor suba al menos un archivo');
       return;
     }
 
@@ -129,7 +155,7 @@ export default function ReclamacionForm() {
       });
 
       if (!response.ok) {
-        throw new Error('Error al generar la reclamación');
+        throw new Error('Error al generar la reclamacion');
       }
 
       const data = await response.json();
@@ -152,7 +178,7 @@ export default function ReclamacionForm() {
         },
         body: JSON.stringify({
           carta,
-          nombreReclamante: `${formData.nombre} ${formData.apellidos}`,
+          nombreReclamante: 'Reclamante',
         }),
       });
 
@@ -166,7 +192,7 @@ export default function ReclamacionForm() {
       a.href = url;
 
       const hoy = new Date().toISOString().split('T')[0];
-      a.download = `reclamacion_${formData.apellidos.replace(/\s+/g, '_')}_${hoy}.docx`;
+      a.download = `reclamacion_${hoy}.docx`;
 
       document.body.appendChild(a);
       a.click();
@@ -183,17 +209,8 @@ export default function ReclamacionForm() {
     setError(null);
     setStep('form');
     setFormData({
-      nombre: '',
-      apellidos: '',
-      dni: '',
-      direccion: '',
-      telefono: '',
-      email: '',
-      aseguradora: '',
-      numeroPóliza: '',
-      matricula: '',
       descripcion: '',
-      tiposDaños: [],
+      tiposDanos: [],
     });
   };
 
@@ -203,7 +220,7 @@ export default function ReclamacionForm() {
         {step === 'form' && (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-8">
-              Generador de Reclamaciones por Accidente de Tráfico
+              Generador de Reclamaciones por Accidente de Trafico
             </h1>
 
             {error && (
@@ -213,7 +230,6 @@ export default function ReclamacionForm() {
             )}
 
             <form onSubmit={handleSubmit}>
-              {/* Drag & Drop */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -222,7 +238,7 @@ export default function ReclamacionForm() {
               >
                 <input
                   type="file"
-                  accept=".pdf,.docx,.doc"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.heic,.heif"
                   onChange={handleFileChange}
                   multiple
                   className="hidden"
@@ -231,20 +247,20 @@ export default function ReclamacionForm() {
                 <label htmlFor="file-input" className="cursor-pointer">
                   <div className="text-gray-600">
                     <p className="text-lg font-medium mb-2">
-                      Arrastra archivos aquí o haz clic para seleccionar
+                      Arrastra archivos aqui o haz clic para seleccionar
                     </p>
                     <p className="text-sm text-gray-500">
-                      Formatos aceptados: PDF, DOCX (puedes subir varios)
+                      Formatos aceptados: PDF, Word, Excel e imagen (puedes subir varios)
                     </p>
                   </div>
                 </label>
               </div>
 
-              {/* Archivos seleccionados */}
               {archivos.length > 0 && (
                 <div className="mb-8 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm font-medium text-green-900 mb-3">
-                    ✓ {archivos.length} archivo{archivos.length !== 1 ? 's' : ''} seleccionado{archivos.length !== 1 ? 's' : ''}:
+                    {archivos.length} archivo{archivos.length !== 1 ? 's' : ''}{' '}
+                    seleccionado{archivos.length !== 1 ? 's' : ''}:
                   </p>
                   <div className="space-y-2">
                     {archivos.map((archivo, index) => (
@@ -266,144 +282,20 @@ export default function ReclamacionForm() {
                 </div>
               )}
 
-              {/* Formulario en dos columnas */}
-              <div className="grid grid-cols-2 gap-6 mb-8">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nombre *
-                  </label>
-                  <input
-                    type="text"
-                    name="nombre"
-                    value={formData.nombre}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Apellidos *
-                  </label>
-                  <input
-                    type="text"
-                    name="apellidos"
-                    value={formData.apellidos}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    DNI *
-                  </label>
-                  <input
-                    type="text"
-                    name="dni"
-                    value={formData.dni}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Teléfono
-                  </label>
-                  <input
-                    type="tel"
-                    name="telefono"
-                    value={formData.telefono}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Dirección
-                  </label>
-                  <input
-                    type="text"
-                    name="direccion"
-                    value={formData.direccion}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aseguradora
-                  </label>
-                  <input
-                    type="text"
-                    name="aseguradora"
-                    value={formData.aseguradora}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Número de Póliza
-                  </label>
-                  <input
-                    type="text"
-                    name="numeroPóliza"
-                    value={formData.numeroPóliza}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Matrícula del Vehículo
-                  </label>
-                  <input
-                    type="text"
-                    name="matricula"
-                    value={formData.matricula}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a5f] focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Checkboxes de daños */}
               <div className="mb-8">
                 <label className="block text-sm font-medium text-gray-700 mb-4">
-                  Tipos de Daños
+                  Tipos de Danos
                 </label>
                 <div className="space-y-2">
                   {[
-                    { id: 'materiales', label: 'Daños materiales' },
-                    { id: 'personales', label: 'Daños personales' },
+                    { id: 'materiales', label: 'Danos materiales' },
+                    { id: 'personales', label: 'Danos personales' },
                     { id: 'lucro_cesante', label: 'Lucro cesante' },
                   ].map((tipo) => (
                     <label key={tipo.id} className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={formData.tiposDaños.includes(tipo.id)}
+                        checked={formData.tiposDanos.includes(tipo.id)}
                         onChange={() => handleCheckboxChange(tipo.id)}
                         className="w-4 h-4 text-[#1e3a5f] rounded focus:ring-2 focus:ring-[#1e3a5f]"
                       />
@@ -413,10 +305,9 @@ export default function ReclamacionForm() {
                 </div>
               </div>
 
-              {/* Textarea descripción */}
               <div className="mb-8">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descripción del Accidente
+                  Descripcion del Accidente
                 </label>
                 <textarea
                   name="descripcion"
@@ -428,13 +319,12 @@ export default function ReclamacionForm() {
                 />
               </div>
 
-              {/* Botón submit */}
               <button
                 type="submit"
                 disabled={isLoading}
                 className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-bold py-3 rounded-lg transition disabled:opacity-50"
               >
-                Generar Reclamación
+                Generar Reclamacion
               </button>
             </form>
           </div>
@@ -467,10 +357,10 @@ export default function ReclamacionForm() {
               </div>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Generando su reclamación...
+              Generando su reclamacion...
             </h2>
             <p className="text-gray-600">
-              Claude está redactando la carta basándose en la legislación española
+              Claude esta redactando la carta basandose en la legislacion espanola
             </p>
           </div>
         )}
@@ -478,12 +368,12 @@ export default function ReclamacionForm() {
         {step === 'result' && (
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Su Reclamación Está Lista
+              Su Reclamacion Esta Lista
             </h2>
 
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700">
-                📝 Puede editar el texto de la carta antes de descargar
+                Puede editar el texto de la carta antes de descargar
               </p>
             </div>
 
@@ -505,7 +395,7 @@ export default function ReclamacionForm() {
                 onClick={handleVolver}
                 className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 font-bold py-3 rounded-lg transition"
               >
-                Nueva Reclamación
+                Nueva Reclamacion
               </button>
             </div>
           </div>
